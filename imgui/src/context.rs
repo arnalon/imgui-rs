@@ -99,6 +99,48 @@ impl Context {
     pub fn create_with_shared_font_atlas(shared_font_atlas: SharedFontAtlas) -> Self {
         Self::create_internal(Some(shared_font_atlas))
     }
+    /// Adopts the Dear ImGui context that is currently active, without taking ownership of it.
+    ///
+    /// This is for embedders that are handed an existing `ImGuiContext*` by a host application
+    /// which owns the context, the font atlas, and the render loop -- an arcdps addon, for
+    /// example. Such an embedder must not create a context, must not call `igNewFrame`, and
+    /// must not destroy the context on shutdown.
+    ///
+    /// The result is wrapped in [`ManuallyDrop`] precisely because dropping a [`Context`] calls
+    /// `igDestroyContext`, which would tear down the host's context.
+    ///
+    /// # Safety
+    ///
+    /// The caller must have already pointed Dear ImGui at the host's context and allocators via
+    /// [`sys::igSetCurrentContext`] and [`sys::igSetAllocatorFunctions`], and must guarantee the
+    /// context outlives the returned value.
+    pub unsafe fn current_borrowed() -> std::mem::ManuallyDrop<Self> {
+        let raw = unsafe { sys::igGetCurrentContext() };
+        assert!(
+            !raw.is_null(),
+            "No current Dear ImGui context; call igSetCurrentContext first"
+        );
+        std::mem::ManuallyDrop::new(Context {
+            raw,
+            shared_font_atlas: None,
+            ini_filename: None,
+            log_filename: None,
+            platform_name: None,
+            renderer_name: None,
+            clipboard_ctx: Box::new(ClipboardContext::dummy().into()),
+            ui: Ui {
+                buffer: UnsafeCell::new(crate::string::UiBuffer::new(1024)),
+            },
+        })
+    }
+    /// Returns the [`Ui`] for a frame that the host application has already begun.
+    ///
+    /// Companion to [`Context::current_borrowed`]: where [`Context::frame`] calls `igNewFrame`
+    /// itself, this assumes the host is driving the frame and only hands out the scratch buffer
+    /// used to pass strings to Dear ImGui.
+    pub fn borrowed_frame(&self) -> &Ui {
+        &self.ui
+    }
     /// Suspends this context so another context can be the active context.
     #[doc(alias = "CreateContext")]
     pub fn suspend(self) -> SuspendedContext {

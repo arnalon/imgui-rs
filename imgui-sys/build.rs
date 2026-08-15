@@ -1,10 +1,12 @@
 #![allow(dead_code)]
 
+// NOTE (arcdps fork): these must produce byte-identical struct layouts to the Dear ImGui
+// build inside arcdps, because an arcdps addon drives arcdps's own ImGuiContext. arcdps
+// builds stock imgui 1.92.7 with an unmodified imconfig.h -- same as the vcpkg `imgui`
+// port that the working C++ addons (Boon Table, killproof.me) link against. So both
+// IMGUI_DISABLE_OBSOLETE_FUNCTIONS (drops real struct members, e.g. ImGuiIO::FontGlobalScale)
+// and IMGUI_USE_WCHAR32 (widens ImWchar) have to stay off here and in the cimgui generator.
 const DEFINES: &[(&str, Option<&str>)] = &[
-    // Match cimgui generated definitions.
-    ("IMGUI_DISABLE_OBSOLETE_FUNCTIONS", None),
-    // Rust `char` is a unicode scalar value, e.g. 32 bits.
-    ("IMGUI_USE_WCHAR32", None),
     // Disabled due to linking issues
     ("CIMGUI_NO_EXPORT", None),
     ("IMGUI_DISABLE_WIN32_FUNCTIONS", None),
@@ -25,27 +27,48 @@ fn find_freetype() -> Vec<impl AsRef<std::path::Path>> {
     }
 }
 
+/// Parses `IMGUI_VERSION` / `IMGUI_VERSION_NUM` out of the vendored `imgui.h` and writes them
+/// into `$OUT_DIR/imgui_version.rs` for `lib.rs` to include.
+fn emit_imgui_version(imgui_h: &std::path::Path) -> std::io::Result<()> {
+    let header = std::fs::read_to_string(imgui_h)?;
+
+    let define = |name: &str| -> Option<String> {
+        header.lines().find_map(|line| {
+            let rest = line.strip_prefix("#define ")?;
+            let rest = rest.strip_prefix(name)?;
+            if !rest.starts_with(char::is_whitespace) {
+                return None;
+            }
+            Some(rest.trim().trim_matches('"').to_string())
+        })
+    };
+
+    let version = define("IMGUI_VERSION")
+        .unwrap_or_else(|| panic!("no IMGUI_VERSION in {}", imgui_h.display()));
+    let version_num = define("IMGUI_VERSION_NUM")
+        .unwrap_or_else(|| panic!("no IMGUI_VERSION_NUM in {}", imgui_h.display()));
+
+    let out = std::path::Path::new(&std::env::var_os("OUT_DIR").unwrap()).join("imgui_version.rs");
+    std::fs::write(
+        out,
+        format!(
+            "/// Dear ImGui version string of the vendored headers, e.g. `\"1.92.7\"`.\n\
+             pub const IMGUI_VERSION: &str = \"{version}\";\n\
+             /// Dear ImGui `IMGUI_VERSION_NUM` of the vendored headers, e.g. `19270`.\n\
+             pub const IMGUI_VERSION_NUM: u32 = {version_num};\n"
+        ),
+    )?;
+    println!("cargo:rerun-if-changed={}", imgui_h.display());
+    println!("cargo:IMGUI_VERSION_NUM={version_num}");
+    Ok(())
+}
+
 // Output define args for compiler
 fn main() -> std::io::Result<()> {
     let external_enabled = std::env::var_os("CARGO_FEATURE_EXTERNAL").is_some();
 
-    if external_enabled {
-        println!(
-            "cargo:warning=feature 'external' enabled, skipping C++ compilation of libcimgui.a"
-        );
-        return Ok(());
-    }
-
     // Root of imgui-sys
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-
-    println!(
-        "cargo:THIRD_PARTY={}",
-        manifest_dir.join("third-party").display()
-    );
-    for (key, value) in DEFINES.iter() {
-        println!("cargo:DEFINE_{}={}", key, value.unwrap_or(""));
-    }
 
     // Feature flags - no extra dependencies, so these are queried as
     // env-vars to avoid recompilation of build.rs
@@ -59,6 +82,26 @@ fn main() -> std::io::Result<()> {
         (false, true) => "third-party/imgui-master-freetype",
         (true, true) => "third-party/imgui-docking-freetype",
     });
+
+    // Lift IMGUI_VERSION/IMGUI_VERSION_NUM out of the vendored headers so downstream crates can
+    // report the version they were actually compiled against, rather than a hardcoded guess.
+    // arcdps refuses an addon's UI callbacks unless this number matches its own exactly.
+    emit_imgui_version(&cimgui_dir.join("imgui/imgui.h"))?;
+
+    if external_enabled {
+        println!(
+            "cargo:warning=feature 'external' enabled, skipping C++ compilation of libcimgui.a"
+        );
+        return Ok(());
+    }
+
+    println!(
+        "cargo:THIRD_PARTY={}",
+        manifest_dir.join("third-party").display()
+    );
+    for (key, value) in DEFINES.iter() {
+        println!("cargo:DEFINE_{}={}", key, value.unwrap_or(""));
+    }
 
     // For projects like implot-rs we expose the path to our cimgui
     // files, via `DEP_IMGUI_THIRD_PARTY` env-var, so they can build

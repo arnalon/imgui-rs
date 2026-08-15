@@ -24,7 +24,10 @@ rm ${CIMGUI_DIR}/imgui || :
 ln -s ${SCRIPT_DIR}/imgui ${CIMGUI_DIR}/imgui
 
 # Run the generator
-luajit generator.lua gcc false -DIMGUI_USE_WCHAR32
+# arcdps fork: no -DIMGUI_USE_WCHAR32 (arcdps uses 16-bit ImWchar), and the
+# generator's hardcoded -DIMGUI_DISABLE_OBSOLETE_FUNCTIONS must be stripped from
+# generator.lua/cpp2ffi.lua first so generated structs keep their obsolete members.
+luajit generator.lua gcc false
 
 # Tidy up
 rm ${CIMGUI_DIR}/imgui # Remove symlink (no recursive rm)

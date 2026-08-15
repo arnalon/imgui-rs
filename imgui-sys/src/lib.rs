@@ -1,5 +1,8 @@
 #![no_std]
 
+// IMGUI_VERSION / IMGUI_VERSION_NUM, read out of the vendored imgui.h by build.rs.
+include!(concat!(env!("OUT_DIR"), "/imgui_version.rs"));
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "wasm")] {
         cfg_if::cfg_if! {
