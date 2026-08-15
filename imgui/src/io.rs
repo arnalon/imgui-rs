@@ -427,7 +427,7 @@ impl Io {
             .iter()
             // TODO: are the values in the buffer guaranteed to be valid unicode
             // scalar values? if so we can just expose this as a `&[char]`...
-            .map(|c| core::char::from_u32(*c).unwrap_or(core::char::REPLACEMENT_CHARACTER))
+            .map(|c| core::char::from_u32(u32::from(*c)).unwrap_or(core::char::REPLACEMENT_CHARACTER))
     }
 
     pub fn update_delta_time(&mut self, delta: Duration) {

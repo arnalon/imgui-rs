@@ -36,7 +36,9 @@ impl Ui {
         let font = fonts
             .get_font(id)
             .expect("Font atlas did not contain the given font");
-        unsafe { sys::igPushFont(font.raw() as *const _ as *mut _) };
+        // 1.92 made the size mandatory; this legacy entry point keeps the font's own size,
+        // i.e. the size it was passed to AddFontXXX() with.
+        unsafe { sys::igPushFont_Nil(font.raw() as *const _ as *mut _) };
         FontStackToken::new(self)
     }
     /// Changes a style color by pushing a change to the color stack.
