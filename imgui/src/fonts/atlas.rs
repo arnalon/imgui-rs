@@ -7,9 +7,8 @@ use std::slice;
 
 use crate::fonts::font::Font;
 use crate::fonts::glyph_ranges::FontGlyphRanges;
-use crate::internal::{ImVector, RawCast};
+use crate::internal::RawCast;
 use crate::sys;
-use crate::TextureId;
 
 bitflags! {
     /// Font atlas configuration flags

@@ -972,7 +972,6 @@ impl<'ui> Image<'ui> {
 
     /// Draw the image on the window.
     pub fn build(self) {
-        use std::os::raw::c_void;
 
         unsafe {
             sys::ImDrawList_AddImage(
@@ -1062,7 +1061,6 @@ impl<'ui> ImageQuad<'ui> {
 
     /// Draw the image on the window.
     pub fn build(self) {
-        use std::os::raw::c_void;
 
         unsafe {
             sys::ImDrawList_AddImageQuad(
@@ -1175,7 +1173,6 @@ impl<'ui> ImageRounded<'ui> {
 
     /// Draw the image on the window.
     pub fn build(self) {
-        use std::os::raw::c_void;
 
         unsafe {
             sys::ImDrawList_AddImageRounded(
