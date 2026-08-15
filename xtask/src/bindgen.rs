@@ -116,7 +116,7 @@ fn generate_binding_file(
 ) -> Result<()> {
     let mut cmd = std::process::Command::new("bindgen");
     let a = &[
-        "--size_t-is-usize",
+        // size_t maps to usize by default since bindgen 0.65; the flag was removed in 0.72.
         "--no-prepend-enum-name",
         "--no-doc-comments",
         // Layout tests aren't portable (they hardcode type sizes), and for
@@ -134,7 +134,8 @@ fn generate_binding_file(
     cmd.args(["--blocklist-type", "__darwin_size_t"]);
     cmd.args(["--raw-line", "#![allow(nonstandard_style, clippy::all)]"]);
     cmd.arg("--output").arg(output);
-    cmd.args(["--ctypes-prefix", "cty"]);
+    // Was `cty`; the crate is no_std and bindgen now emits core::ffi types directly.
+    cmd.args(["--ctypes-prefix", "core::ffi"]);
 
     if let Some(name) = wasm_import_mod {
         cmd.args(["--wasm-import-module-name", name]);
